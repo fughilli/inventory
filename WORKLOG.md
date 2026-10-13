@@ -22,8 +22,37 @@ current.
   tests under the pinned nixpkgs (aarch64-linux, via nix-portable). The
   board's full system closure / SD image was not built.
 - The bench (overhead camera + tablet) is future work; see README "Later".
-- **Docker stack never run** (no docker in the dev container). See the
-  Docker + Tailscale entry below for what was checked instead.
+- **Docker stack** has only been run by the user, on a Mac; not in the dev
+  container (no docker). Identification keys go in
+  `~/.config/inventory/secrets.env`; first live Google/Claude calls pending.
+- **Pi 3/4 targets, zram, printd binding, attic substituter: Nix never
+  evaluated here.**
+
+## 2026-10-13 (later) — first real use: Pi printer + Docker server
+
+- Pi deployed (board reused from another project, still named `tdplayer`;
+  README "Renaming a Pi" covers rename-in-place). printd now binds 0.0.0.0;
+  8631 isn't in the firewall, so only localhost + trusted tailscale0 reach it.
+- Docker server prints through it: `--printd <host>` / `INVENTORY_PRINTD_HOST`
+  resolve the peer's tailnet IP in the sidecar (containers don't get MagicDNS).
+  That needs outbound tailnet traffic, so the sidecar moved to kernel mode
+  (tun + NET_ADMIN).
+- Mac Docker runs in a VM that only sees shared folders; an unshared bind-mount
+  source silently became an empty dir ("read /run/secrets/tsauthkey: is a
+  directory"). Now nothing is bind-mounted: key via env, data in named volumes
+  (`inventory_data`, `inventory_tailscale`), serve.json baked into
+  `Dockerfile.tailscale`. env_file paths are read by the compose CLI, so they
+  still work. Overrides in `~/.config/inventory/docker.env`.
+- Pixel Fold: "desktop site" was on (user fixed). The white strip under the tab
+  bar is Chrome 135+'s bottom "chin", painted in the page's root background, so
+  `html` now uses the bar colour and `body` the page colour.
+- Pi 3/4 targets (`garage_pi3.*`, `garage_pi4.*`), zram, MemoryHigh=75%.
+- Attic cache (user's change): flake `nixConfig` + on-Pi substituter + push
+  after deploy via sbc_application `attic_cache`.
+- Verified here: script flows with a fake `docker`; mobile layout via
+  Playwright (Node) at 412/841/360 px with `isMobile`, no overflow; Bazel query.
+  NOT verified: real Docker run, Nix eval of the Pi changes (a background
+  nix-portable eval killed the shell tool, so skip that recipe), on-device chin.
 
 ## 2026-10-13 — Docker + Tailscale
 

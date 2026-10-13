@@ -61,8 +61,18 @@ Fixes, in `/var/lib/inventory/printd.env` (then `systemctl restart sbc-printd`):
 
 ## Deploying the Pi
 
-You need `nix` (flakes enabled) and `bazelisk` on your workstation. Pi 4 or 5
-recommended; the board is set in `deploy/BUILD.bazel`.
+You need `nix` (flakes enabled) and `bazelisk` on your workstation. Each board
+has its own set of targets; the commands below are for a Pi 5:
+
+| Board | Targets |
+| --- | --- |
+| Pi 5 | `//deploy:garage.*` |
+| Pi 4 | `//deploy:garage_pi4.*` |
+| Pi 3 | `//deploy:garage_pi3.*` |
+
+They build the same system. The Pi 3 works but has only 1 GB of RAM, so the
+image adds compressed RAM swap (zram) to make room for the CLIP model, and
+indexing new photos is slower than on a Pi 4 or 5.
 
 ```sh
 cp deploy/wifi.yaml.example deploy/wifi.yaml            # your WiFi (gitignored)
@@ -78,6 +88,18 @@ Updates after the first flash:
 
 ```sh
 bazel run //deploy:garage.deploy_live -- garage.local
+```
+
+### Renaming a Pi
+
+The hostname is written once, on first boot, to `/var/lib/sbc/hostname`, and
+`deploy_live` reuses it, so a Pi first deployed for another project keeps that
+project's name. To rename it in place (here from `tdplayer`):
+
+```sh
+ssh root@tdplayer rm /var/lib/sbc/hostname
+bazel run //deploy:garage.deploy_live -- tdplayer --hostname garage
+ssh root@tdplayer tailscale set --hostname=garage     # tailnet name, if it didn't follow
 ```
 
 ### API keys (optional, recommended)
@@ -146,11 +168,28 @@ state is kept.
 
 | What | Where |
 | --- | --- |
-| Database, photos, CLIP model, Tailscale state | `~/.local/share/inventory/` (`INVENTORY_HOME`) |
+| Database, photos, CLIP model | Docker volume `inventory_data` (`docker/inventory.sh backup` saves a copy) |
+| Tailscale node state | Docker volume `inventory_tailscale` |
+| Settings like `INVENTORY_LOCAL_PORT=8090` | `~/.config/inventory/docker.env` |
 | API keys (`GOOGLE_VISION_API_KEY=…`, `ANTHROPIC_API_KEY=…`) | `~/.config/inventory/secrets.env` |
 | Printer overrides (`PRINTD_*`) | `~/.config/inventory/printd.env` |
 
-Other commands: `docker/inventory.sh down | restart | logs [service] | status | url`.
+To print on a label printer attached to the Pi, point the Docker server at the
+Pi's print agent over the tailnet. Use the Pi's tailnet name; it's remembered for
+later `up`s, and `--printd local` forgets it:
+
+```sh
+docker/inventory.sh up --printd garage
+```
+
+The Pi's `printd` listens on all interfaces, but port 8631 isn't opened in its
+firewall, so only the tailnet (and the Pi itself) can reach it.
+
+Other commands: `docker/inventory.sh down | restart | logs [service] | status | url | backup`.
+
+Nothing is mounted from your home folder. Docker on a Mac runs in a VM that
+only sees shared folders, so the auth key is passed as an environment variable
+and the data lives in Docker volumes.
 With the label printer plugged into the Docker host (Linux only), use
 `docker/inventory.sh up --printer`, or pass `--printer /dev/usb/lp1` to pick
 the device; that also runs `printd` in the stack.

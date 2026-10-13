@@ -1,0 +1,6 @@
+# The tailscale sidecar with its serve config baked in, so the stack needs no
+# files bind-mounted from the host (Docker on a Mac runs in a VM that only sees
+# shared folders; anything else silently becomes an empty directory).
+ARG TS_IMAGE_TAG=stable
+FROM tailscale/tailscale:${TS_IMAGE_TAG}
+COPY serve.json /config/serve.json

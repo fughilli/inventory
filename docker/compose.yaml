@@ -3,30 +3,41 @@
 #
 #   tailscale  the tailnet node (sidecar). Owns the network namespace, serves
 #              https://<TS_HOSTNAME>.<tailnet>.ts.net -> 127.0.0.1:8080.
-#   server     the inventory app, in tailscale's network namespace.
+#   server     the inventory app, in tailscale's network namespace. Prints via
+#              INVENTORY_PRINTD_URL: local printd, or one on a tailnet Pi.
 #   printd     optional (profile "printer"): the label printer agent, for a
 #              USB printer attached to this host.
+#
+# Nothing is bind-mounted from the host: state lives in the named volumes
+# inventory_data (db, photos, CLIP model) and inventory_tailscale (node state).
 name: inventory
 
 services:
   tailscale:
-    image: tailscale/tailscale:${TS_IMAGE_TAG:-stable}
+    build:
+      context: .
+      dockerfile: Dockerfile.tailscale
+      args:
+        TS_IMAGE_TAG: ${TS_IMAGE_TAG:-stable}
+    image: inventory-tailscale:local
     hostname: ${TS_HOSTNAME:-inventory}
     environment:
-      # "file:/run/secrets/tsauthkey", or empty once the node is logged in
-      # (state persists in the volume below, so the key is only needed once).
-      TS_AUTHKEY: ${TS_AUTHKEY_ARG:-}
+      # The auth key, read from ~/.config/inventory/tsauthkey by inventory.sh.
+      # Only used to log in the first time; the node state is kept in the volume.
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
       TS_AUTH_ONCE: "true"
       TS_HOSTNAME: ${TS_HOSTNAME:-inventory}
       TS_STATE_DIR: /var/lib/tailscale
       TS_SERVE_CONFIG: /config/serve.json
-      # Userspace networking: no /dev/net/tun or NET_ADMIN, so it also runs on
-      # Docker Desktop. Serve still works; nothing here dials out over the tailnet.
-      TS_USERSPACE: "true"
+      # Kernel networking, so the server can also dial OUT to tailnet peers
+      # (a printd on the Pi). Works on Linux, Docker Desktop and Colima.
+      # TS_USERSPACE=true avoids the tun device but then only inbound works.
+      TS_USERSPACE: ${TS_USERSPACE:-false}
     volumes:
-      - ${INVENTORY_HOME:?}/tailscale:/var/lib/tailscale
-      - ${TS_AUTHKEY_MOUNT:?}:/run/secrets/tsauthkey:ro
-      - ./serve.json:/config/serve.json:ro
+      - tailscale:/var/lib/tailscale
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [net_admin]
     ports:
       # The app, for this machine (or your LAN with INVENTORY_BIND=0.0.0.0).
       - ${INVENTORY_BIND:-127.0.0.1}:${INVENTORY_LOCAL_PORT:-8080}:8080
@@ -39,17 +50,19 @@ services:
     image: inventory:local
     network_mode: service:tailscale
     depends_on: [tailscale]
-    user: ${INVENTORY_UID:-0}:${INVENTORY_GID:-0}
     # API keys etc. (GOOGLE_VISION_API_KEY, ANTHROPIC_API_KEY), same format as
-    # the Pi's /var/lib/inventory/secrets.env. /dev/null when absent.
+    # the Pi's /var/lib/inventory/secrets.env. /dev/null when absent. Read by
+    # the compose CLI on this machine, so it isn't a mount.
     env_file: ${INVENTORY_ENV_FILE:?}
     environment:
       HOME: /data
       # Empty = label QR codes use the address the app was opened at, which is
       # https://<TS_HOSTNAME>.<tailnet>.ts.net through the sidecar.
       INVENTORY_PUBLIC_URL: ${INVENTORY_PUBLIC_URL:-}
+      # Set by inventory.sh --printd <tailnet host>; default is the local printd.
+      INVENTORY_PRINTD_URL: ${INVENTORY_PRINTD_URL:-http://127.0.0.1:8631}
     volumes:
-      - ${INVENTORY_HOME:?}/data:/data
+      - data:/data
     restart: unless-stopped
 
   printd:
@@ -67,3 +80,7 @@ services:
     devices:
       - ${PRINTD_DEVICE:-/dev/usb/lp0}:/dev/usb/lp0
     restart: unless-stopped
+
+volumes:
+  data:
+  tailscale:
