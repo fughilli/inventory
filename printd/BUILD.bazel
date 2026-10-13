@@ -1,0 +1,8 @@
+filegroup(
+    name = "srcs",
+    srcs = glob(
+        ["pyproject.toml", "printd/**/*.py", "tests/**/*.py"],
+        exclude = ["**/__pycache__/**"],
+    ),
+    visibility = ["//deploy:__subpackages__"],
+)

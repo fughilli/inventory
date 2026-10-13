@@ -1,0 +1,19 @@
+load(":defs.bzl", "flake_srcs")
+
+# The app sources, re-rooted under deploy/nix/src/ so they land inside the
+# staged flake tree as ./src/{server,web,printd} (see packages.nix).
+flake_srcs(
+    name = "app_srcs",
+    srcs = [
+        "//printd:srcs",
+        "//server:srcs",
+        "//web:srcs",
+    ],
+    prefix = "src",
+)
+
+filegroup(
+    name = "flake",
+    srcs = glob(["*.nix", "flake.lock"], allow_empty = True) + [":app_srcs"],
+    visibility = ["//deploy:__pkg__"],
+)

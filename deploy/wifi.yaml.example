@@ -1,0 +1,5 @@
+# WiFi networks for the garage Pi, most-preferred first (or set `priority`).
+# Copy to deploy/wifi.yaml (gitignored) and fill in real credentials.
+- ssid: YOUR_SSID
+  psk: YOUR_PSK
+  priority: 100

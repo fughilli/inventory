@@ -1,0 +1,22 @@
+# The garage Pi: inventory server + PWA + label-printer agent on NixOS.
+#
+#   bazel run //deploy:garage.keys          -- init            # once: deploy SSH key
+#   bazel run //deploy:garage.image_sd      -- --device /dev/sdX   # flash a card
+#   bazel run //deploy:garage.deploy_live   -- garage.local    # push updates
+#   bazel run //deploy:garage.ssh                               # shell on the Pi
+#
+# Needs `nix` (flakes) on the host and deploy/wifi.yaml (copy wifi.yaml.example).
+
+load("@sbc_deploy//deploy:defs.bzl", "sbc_application")
+
+sbc_application(
+    name = "garage",
+    flake = "deploy/nix",
+    flake_srcs = ["//deploy/nix:flake"],
+    hostname = "garage",
+    # Pi 4 or 5 recommended (the CLIP model wants ~400 MB RAM). Swap for
+    # :raspberry-pi-4 / -3 to match your board.
+    board = "@sbc_deploy//deploy/boards:raspberry-pi-5",
+    lean = True,
+    wifi_config_file = "wifi.yaml",
+)

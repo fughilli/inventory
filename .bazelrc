@@ -1,0 +1,12 @@
+# The bundled JDK SIGILLs on Armv9 SVE (Apple-silicon hosts running an aarch64
+# container); disable SVE and tolerate the flag on hosts without it.
+startup --host_jvm_args=-XX:+IgnoreUnrecognizedVMOptions
+startup --host_jvm_args=-XX:UseSVE=0
+
+common --enable_bzlmod
+# sbc-deploy's rules_nixpkgs extension usages are isolated (required when it is
+# a dependency rather than the root module).
+common --experimental_isolated_extension_usages
+
+build --incompatible_strict_action_env
+common --color=yes

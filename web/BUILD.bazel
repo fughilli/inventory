@@ -1,0 +1,13 @@
+filegroup(
+    name = "srcs",
+    srcs = glob([
+        "package.json",
+        "package-lock.json",
+        "tsconfig.json",
+        "vite.config.ts",
+        "index.html",
+        "src/**",
+        "public/**",
+    ]),
+    visibility = ["//deploy:__subpackages__"],
+)

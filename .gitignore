@@ -1,0 +1,27 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+server/data/
+
+# Web
+web/node_modules/
+web/dist/
+
+# Bazel
+/bazel-*
+/.bazelisk/
+
+# Nix / sbc-deploy
+/result
+/result-*
+/.sbc-build/
+
+# Secrets: deploy keys, API keys, WiFi credentials. Only READMEs are tracked.
+**/secrets/*
+!**/secrets/README.md
+deploy/wifi.yaml
+
+.DS_Store

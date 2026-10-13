@@ -1,0 +1,20 @@
+"""inventory — garage storage-bin inventory.
+
+Bazel's only job here is the Raspberry Pi deployment (via sbc-deploy): the
+server, web app, and print agent are built by Nix inside the Pi's NixOS image.
+Day-to-day development uses uv (server/, printd/) and npm (web/) directly; see
+README.md.
+"""
+
+module(
+    name = "inventory",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "sbc_deploy", version = "0.0.0")
+git_override(
+    module_name = "sbc_deploy",
+    remote = "https://github.com/fughilli/sbc-deploy.git",
+    # Keep in sync with the sbc-deploy rev in deploy/nix/flake.nix.
+    commit = "e1dfe97b07a8a0cd2339604d14e262e0903eca26",
+)

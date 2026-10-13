@@ -1,0 +1,9 @@
+# Sources shipped into the Pi image (built there by Nix; see deploy/nix).
+filegroup(
+    name = "srcs",
+    srcs = glob(
+        ["pyproject.toml", "inventory/**/*.py", "tests/**/*.py"],
+        exclude = ["**/__pycache__/**"],
+    ),
+    visibility = ["//deploy:__subpackages__"],
+)
