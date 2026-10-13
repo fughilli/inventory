@@ -6,6 +6,8 @@
   --concrete: #e4e5e1;
   --surface: #f4f4f1;
   --tote: #1d1f1c;
+  /* Top bar and tab bar, same in light and dark. */
+  --bar: #1d1f1c;
   --hazard: #f2c200;
   --hazard-ink: #1d1f1c;
   --label: #ffffff;
@@ -51,12 +53,18 @@
   display: none !important;
 }
 
+/* The root background is what Chrome on Android paints in the gesture-bar
+   strip under the page (the "chin", Chrome 135+), so it matches the tab bar;
+   the body carries the page colour. */
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--bar);
 }
 
 body {
   margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--concrete);
   color: var(--tote);
   font: 400 17px/1.45 var(--font);
@@ -130,7 +138,7 @@ small {
   align-items: center;
   justify-content: space-between;
   padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
-  background: #1d1f1c;
+  background: var(--bar);
   color: #ecede8;
 }
 .brand {
@@ -173,7 +181,7 @@ small {
   align-items: stretch;
   height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  background: #1d1f1c;
+  background: var(--bar);
   color: #b9bdb6;
 }
 .nav-link {
