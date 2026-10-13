@@ -1,5 +1,6 @@
 # The garage Pi: inventory server + PWA + label-printer agent on NixOS.
 #
+# (Pi 3 / Pi 4: use garage_pi3.* / garage_pi4.* in place of garage.*)
 #   bazel run //deploy:garage.keys          -- init            # once: deploy SSH key
 #   bazel run //deploy:garage.image_sd      -- --device /dev/sdX   # flash a card
 #   bazel run //deploy:garage.deploy_live   -- garage.local    # push updates
@@ -10,17 +11,32 @@
 
 load("@sbc_deploy//deploy:defs.bzl", "sbc_application")
 
-sbc_application(
-    name = "garage",
+# Self-hosted Attic nix cache (shared with the splanc project; tailnet node
+# `attic`, tag:attic). After a build, deploy_live pushes the closure there
+# (best-effort, tokenless: the cache's Caddy proxy injects the bearer), so later
+# deploys substitute the from-source Pi kernels instead of rebuilding them.
+_attic_cache = "attic:splanc"
+
+_attic_endpoint = "http://attic.tail6b8ad3.ts.net:8080"
+
+# One target set per board, all the same system and hostname: garage.* for a
+# Pi 5, garage_pi4.* for a Pi 4, garage_pi3.* for a Pi 3 (1 GB of RAM: photo
+# indexing is slower and leans on zram swap).
+[sbc_application(
+    name = name,
+    attic_cache = _attic_cache,
+    attic_endpoint = _attic_endpoint,
     flake = "deploy/nix",
     flake_srcs = ["//deploy/nix:flake"],
     hostname = "garage",
-    # Pi 4 or 5 recommended (the CLIP model wants ~400 MB RAM). Swap for
-    # :raspberry-pi-4 / -3 to match your board.
-    board = "@sbc_deploy//deploy/boards:raspberry-pi-5",
+    board = "@sbc_deploy//deploy/boards:" + board,
     lean = True,
     wifi_config_file = "wifi.yaml",
-)
+) for name, board in [
+    ("garage", "raspberry-pi-5"),
+    ("garage_pi4", "raspberry-pi-4"),
+    ("garage_pi3", "raspberry-pi-3"),
+]]
 
 # Put the Tailscale auth key on the Pi (/var/lib/tailscale/authkey) and join the
 # tailnet + serve HTTPS. Once per flashed card. Reads deploy/secrets/tailscale-authkey

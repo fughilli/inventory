@@ -28,7 +28,9 @@ in
       # API keys (GOOGLE_VISION_API_KEY, ANTHROPIC_API_KEY) and overrides live
       # on the board only, never in the Nix store. Optional ("-").
       EnvironmentFile = "-/var/lib/inventory/secrets.env";
-      MemoryHigh = "900M";
+      # Soft cap relative to RAM: the CLIP model wants ~400 MB, which is most
+      # of a Pi 3's 1 GB.
+      MemoryHigh = "75%";
     };
   };
 
@@ -38,7 +40,11 @@ in
     exec = "bin/printd";
     extraGroups = [ "lp" ];
     environment = {
-      PRINTD_HOST = "127.0.0.1";
+      # All interfaces, so an inventory server elsewhere on the tailnet (e.g.
+      # docker/inventory.sh --printd <this host>) can print here. Port 8631 is
+      # not opened in the firewall, so only localhost and the trusted
+      # tailscale0 interface reach it, not the LAN.
+      PRINTD_HOST = "0.0.0.0";
       PRINTD_PORT = "8631";
       PRINTD_LABEL = "4x6";
       PRINTD_DENSITY = "8";
@@ -74,6 +80,13 @@ in
       fi
       tailscale serve --bg http://127.0.0.1:80
     '';
+  };
+
+  # Compressed swap in RAM. Cheap headroom for the CLIP model on 1 GB boards
+  # (Pi 3); idle on bigger ones.
+  zramSwap = {
+    enable = true;
+    memoryPercent = 50;
   };
 
   # USB printer class device -> /dev/usb/lp0, writable by the lp group.
