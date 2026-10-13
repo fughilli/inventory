@@ -4,6 +4,7 @@
 #   bazel run //deploy:garage.image_sd      -- --device /dev/sdX   # flash a card
 #   bazel run //deploy:garage.deploy_live   -- garage.local    # push updates
 #   bazel run //deploy:garage.ssh                               # shell on the Pi
+#   bazel run //deploy:seed_tailscale_authkey                   # join the tailnet
 #
 # Needs `nix` (flakes) on the host and deploy/wifi.yaml (copy wifi.yaml.example).
 
@@ -19,4 +20,13 @@ sbc_application(
     board = "@sbc_deploy//deploy/boards:raspberry-pi-5",
     lean = True,
     wifi_config_file = "wifi.yaml",
+)
+
+# Put the Tailscale auth key on the Pi (/var/lib/tailscale/authkey) and join the
+# tailnet + serve HTTPS. Once per flashed card. Reads deploy/secrets/tailscale-authkey
+# or ~/.config/inventory/tsauthkey, and deploy/secrets/deploy_key.
+#   bazel run //deploy:seed_tailscale_authkey [-- host]
+sh_binary(
+    name = "seed_tailscale_authkey",
+    srcs = ["scripts/seed-tailscale-authkey.sh"],
 )

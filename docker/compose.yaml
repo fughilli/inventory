@@ -1,0 +1,69 @@
+# inventory on a Docker host, on your tailnet. Run it via docker/inventory.sh,
+# which fills in the variables below; see the README "Docker" section.
+#
+#   tailscale  the tailnet node (sidecar). Owns the network namespace, serves
+#              https://<TS_HOSTNAME>.<tailnet>.ts.net -> 127.0.0.1:8080.
+#   server     the inventory app, in tailscale's network namespace.
+#   printd     optional (profile "printer"): the label printer agent, for a
+#              USB printer attached to this host.
+name: inventory
+
+services:
+  tailscale:
+    image: tailscale/tailscale:${TS_IMAGE_TAG:-stable}
+    hostname: ${TS_HOSTNAME:-inventory}
+    environment:
+      # "file:/run/secrets/tsauthkey", or empty once the node is logged in
+      # (state persists in the volume below, so the key is only needed once).
+      TS_AUTHKEY: ${TS_AUTHKEY_ARG:-}
+      TS_AUTH_ONCE: "true"
+      TS_HOSTNAME: ${TS_HOSTNAME:-inventory}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      # Userspace networking: no /dev/net/tun or NET_ADMIN, so it also runs on
+      # Docker Desktop. Serve still works; nothing here dials out over the tailnet.
+      TS_USERSPACE: "true"
+    volumes:
+      - ${INVENTORY_HOME:?}/tailscale:/var/lib/tailscale
+      - ${TS_AUTHKEY_MOUNT:?}:/run/secrets/tsauthkey:ro
+      - ./serve.json:/config/serve.json:ro
+    ports:
+      # The app, for this machine (or your LAN with INVENTORY_BIND=0.0.0.0).
+      - ${INVENTORY_BIND:-127.0.0.1}:${INVENTORY_LOCAL_PORT:-8080}:8080
+    restart: unless-stopped
+
+  server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: inventory:local
+    network_mode: service:tailscale
+    depends_on: [tailscale]
+    user: ${INVENTORY_UID:-0}:${INVENTORY_GID:-0}
+    # API keys etc. (GOOGLE_VISION_API_KEY, ANTHROPIC_API_KEY), same format as
+    # the Pi's /var/lib/inventory/secrets.env. /dev/null when absent.
+    env_file: ${INVENTORY_ENV_FILE:?}
+    environment:
+      HOME: /data
+      # Empty = label QR codes use the address the app was opened at, which is
+      # https://<TS_HOSTNAME>.<tailnet>.ts.net through the sidecar.
+      INVENTORY_PUBLIC_URL: ${INVENTORY_PUBLIC_URL:-}
+    volumes:
+      - ${INVENTORY_HOME:?}/data:/data
+    restart: unless-stopped
+
+  printd:
+    profiles: [printer]
+    image: inventory:local
+    network_mode: service:tailscale
+    depends_on: [server]
+    command: [printd]
+    environment:
+      PRINTD_HOST: 127.0.0.1
+      PRINTD_PORT: "8631"
+      PRINTD_DEVICE: /dev/usb/lp0
+      PRINTD_LABEL: 4x6
+    env_file: ${PRINTD_ENV_FILE:-/dev/null}
+    devices:
+      - ${PRINTD_DEVICE:-/dev/usb/lp0}:/dev/usb/lp0
+    restart: unless-stopped

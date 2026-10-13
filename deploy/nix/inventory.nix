@@ -1,6 +1,6 @@
 # The application half of the image: the inventory server (port 80) and the
 # label-printer agent (localhost:8631), as sbc-deploy hardened services.
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 let
   pkgsInv = pkgs.callPackage ./packages.nix { };
   host = config.networking.hostName;
@@ -46,6 +46,34 @@ in
       PRINTD_DIRECTION = "0";
     };
     extraServiceConfig.EnvironmentFile = "-/var/lib/inventory/printd.env";
+  };
+
+  # https://<host>.<tailnet>.ts.net -> the app, once the board is on the
+  # tailnet (see system.nix). Serve config persists in tailscaled's state, so
+  # this only (re)asserts it. Not logged in yet: exits quietly, and the
+  # seed_tailscale_authkey script restarts it after seeding. Needs HTTPS
+  # certificates enabled for the tailnet (admin console -> DNS).
+  systemd.services.inventory-tailscale-serve = lib.mkIf config.services.tailscale.enable {
+    description = "Serve the inventory app over HTTPS on the tailnet";
+    after = [ "tailscaled.service" "tailscaled-autoconnect.service" ];
+    wants = [ "tailscaled.service" ];
+    wantedBy = [ "multi-user.target" ];
+    path = [ config.services.tailscale.package ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      for _ in $(seq 30); do
+        tailscale status --peers=false >/dev/null 2>&1 && break
+        sleep 2
+      done
+      if ! tailscale status --peers=false >/dev/null 2>&1; then
+        echo "not logged in to the tailnet; skipping serve"
+        exit 0
+      fi
+      tailscale serve --bg http://127.0.0.1:80
+    '';
   };
 
   # USB printer class device -> /dev/usb/lp0, writable by the lp group.

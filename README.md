@@ -103,21 +103,60 @@ grouping. You just type item names yourself.
 - **Claude** sees the photo plus Google's hints. It handles custom equipment
   and raw materials, and it categorises and tags every item.
 
-### HTTPS / remote access (optional)
+### HTTPS / remote access (Tailscale)
 
 The PWA works over plain `http://garage.local`. Photos use the native camera,
 and bin QR codes are read from a snapshot. Live viewfinder QR scanning needs
-HTTPS, which Tailscale provides:
+HTTPS, which Tailscale provides. The image includes `tailscaled`, which logs in
+from an auth key at `/var/lib/tailscale/authkey` on the Pi. The key is never
+baked into the image. Make a key at
+<https://login.tailscale.com/admin/settings/keys>, save it as
+`~/.config/inventory/tsauthkey` (shared with the Docker setup) or
+`deploy/secrets/tailscale-authkey`, and after flashing a card run:
 
 ```sh
-bazel run //deploy:garage.seed_tailscale     # reads deploy/secrets/tailscale-authkey
-bazel run //deploy:garage.ssh -- -- tailscale serve --bg 80
+bazel run //deploy:seed_tailscale_authkey    # [-- host], default garage.local
 ```
+
+This copies the key over, joins the tailnet as `garage`, and serves the app at
+`https://garage.<tailnet>.ts.net`. HTTPS needs MagicDNS and HTTPS certificates
+turned on for the tailnet (admin console → DNS). The node stays joined across
+reboots and redeploys; only a reflash wipes `/var/lib`, so re-run it then.
 
 Then set `INVENTORY_PUBLIC_URL=https://garage.<tailnet>.ts.net` in
 `secrets.env` before printing labels, so their QR codes point at the HTTPS
 address. Labels printed earlier keep their old URL (and `http://garage.local/b/…` keeps
 working at home).
+
+## Running in Docker (on your tailnet)
+
+To run the server on any Docker host instead of (or before) the Pi, with a
+Tailscale sidecar that puts it on your tailnet:
+
+```sh
+mkdir -p ~/.config/inventory
+(umask 077; cat > ~/.config/inventory/tsauthkey)   # paste the auth key, Ctrl-D
+docker/inventory.sh up                             # builds, starts, prints the URL
+```
+
+It joins the tailnet as `inventory` (`TS_HOSTNAME=…` to change it) and serves
+`https://inventory.<tailnet>.ts.net`. It's also at `http://127.0.0.1:8080`
+on the host. The auth key is only needed for the first start, because the node's
+state is kept.
+
+| What | Where |
+| --- | --- |
+| Database, photos, CLIP model, Tailscale state | `~/.local/share/inventory/` (`INVENTORY_HOME`) |
+| API keys (`GOOGLE_VISION_API_KEY=…`, `ANTHROPIC_API_KEY=…`) | `~/.config/inventory/secrets.env` |
+| Printer overrides (`PRINTD_*`) | `~/.config/inventory/printd.env` |
+
+Other commands: `docker/inventory.sh down | restart | logs [service] | status | url`.
+With the label printer plugged into the Docker host (Linux only), use
+`docker/inventory.sh up --printer`, or pass `--printer /dev/usb/lp1` to pick
+the device; that also runs `printd` in the stack.
+
+Label QR codes point at whatever address you opened the app from, normally the
+`ts.net` one. Set `INVENTORY_PUBLIC_URL` to pin them.
 
 ### Backups
 

@@ -22,6 +22,38 @@ current.
   tests under the pinned nixpkgs (aarch64-linux, via nix-portable). The
   board's full system closure / SD image was not built.
 - The bench (overhead camera + tablet) is future work; see README "Later".
+- **Docker stack never run** (no docker in the dev container). See the
+  Docker + Tailscale entry below for what was checked instead.
+
+## 2026-10-13 — Docker + Tailscale
+
+Run the server on any Docker host, on the tailnet (`docker/`, driven by
+`docker/inventory.sh up|down|logs|status|url|shell`):
+- **tailscale sidecar** (`tailscale/tailscale`) in userspace mode
+  (`TS_USERSPACE=true`: no tun/NET_ADMIN, works on Docker Desktop). Auth key via
+  `TS_AUTHKEY=file:/run/secrets/tsauthkey`, mounted from
+  `~/.config/inventory/tsauthkey`. `TS_AUTH_ONCE` plus persisted state, so the key
+  is only needed for the first join. `TS_SERVE_CONFIG=serve.json` uses
+  `${TS_CERT_DOMAIN}` to serve `https://<TS_HOSTNAME>.<tailnet>.ts.net` ->
+  `127.0.0.1:8080`.
+- **server** shares the sidecar's network namespace
+  (`network_mode: service:tailscale`) and runs as the invoking uid/gid. Data
+  lives in `$INVENTORY_HOME` (default `~/.local/share/inventory`).
+- **printd** sits behind the optional compose profile `printer`
+  (`up --printer [/dev/usb/lpN]`), in the same image.
+
+Pi: `sbcDeploy.tailscale.authKeyFile = /var/lib/tailscale/authkey` (system.nix),
+seeded out of band by `bazel run //deploy:seed_tailscale_authkey [-- host]`
+(splanc pi/hitl pattern: key over ssh stdin, then restart
+tailscaled-autoconnect). A new `inventory-tailscale-serve` oneshot
+(inventory.nix) runs `tailscale serve --bg http://127.0.0.1:80` once logged in.
+
+Verification: static review only so far. The agent shell was broken (EIO), so
+none of the planned checks ran: bash -n/shellcheck, compose/serve.json parse,
+fake-docker simulation of inventory.sh, the pip install of the Dockerfile
+packages, the bazel build of `//deploy:seed_tailscale_authkey`, and the Nix
+eval. Fix found in review: `ts_name` failed under `set -eo pipefail` while
+tailscale wasn't up yet (`|| true` added).
 
 ## 2026-10-13 — initial build
 

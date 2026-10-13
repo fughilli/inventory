@@ -4,8 +4,13 @@
 {
   # WiFi comes from deploy/wifi.yaml (sbc_application wifi_config_file).
 
-  # Optional: join your tailnet for remote access + real HTTPS (which enables
-  # live QR scanning in the PWA). Then once: `bazel run //deploy:garage.seed_tailscale`
-  # and on the Pi: `tailscale serve --bg 80`.
-  sbcDeploy.tailscale.enable = true;
+  # Tailscale: remote access + real HTTPS (which enables live QR scanning in the
+  # PWA). The auth key is seeded out of band, never in git or the Nix store:
+  #   bazel run //deploy:seed_tailscale_authkey
+  # tailscaled-autoconnect logs in from it on a fresh state dir (e.g. after a
+  # reflash) and is a no-op once logged in. The tailnet name is the hostname.
+  sbcDeploy.tailscale = {
+    enable = true;
+    authKeyFile = "/var/lib/tailscale/authkey";
+  };
 }

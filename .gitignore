@@ -25,3 +25,6 @@ web/dist/
 deploy/wifi.yaml
 
 .DS_Store
+
+credentials/
+core
